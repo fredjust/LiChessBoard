@@ -26,8 +26,12 @@ char hexaKeys[8][8] = {
   {'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X'}
 };
 
-byte rowPins[8] = {12, 11, 10, 9, 8, 7, 6, 13}; //connect to the row pinouts of the keypad
-byte colPins[8] = {14, 15, 16, 17, 4, 3, 2, 5}; 
+//byte rowPins[8] = {12, 11, 10, 9, 8, 7, 6, 13}; 
+//byte colPins[8] = {14, 15, 16, 17, 4, 3, 2, 5}; 
+
+//LES BONNES PIN POUR MON LICHESSBOARD tout en un 50 vert
+byte rowPins[8] = {12, 11, 10, 9, 8, 7, 6, 5}; 
+byte colPins[8] = {13, 2, 3, 4, 17, 16, 15, 14}; 
 
 byte NewbitMap[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -85,6 +89,31 @@ byte ImReady() {
   return 0;
 }
 
+
+//-----------------------------------------------------------
+// animation de départ allume une ligne et une colonne
+//-----------------------------------------------------------
+byte onePiece() {
+  
+  for (int i = 0; i < 8; i++) {        
+    for (int j = 0; j < 8; j++) {
+      if (bitRead(ChessBoard.bitMap[i], j)==1){
+        
+           
+        matrix.drawPixel(i, j, LED_ON);    
+        
+        
+      }
+    matrix.writeDisplay();  // write the changes we just made to the display
+    
+    }
+  }
+  
+  //delay(10);
+  return 0;
+}
+
+
 //******************************************************************************************
 //                          SETUP
 //******************************************************************************************
@@ -106,6 +135,21 @@ void setup()
   matrix.clear();      
   matrix.writeDisplay();
   //matrix.setBrightness(16);
+
+  ImReady();
+  /*
+   while (nbPiece < 3)
+  {
+    if ( ChessBoard.getKeys() )
+    {
+      PermuToBOARD();           
+      onePiece();
+      if (nbPiece==0){
+        matrix.clear();
+        matrix.writeDisplay();
+      }
+    }
+  }    
 
   //-----------------------------------------------------------
   //  Allume les cases qui contiennent une piece
@@ -148,6 +192,7 @@ void setup()
   }  
   // il est pret lance l'animation
   ImReady();
+  */
 }
 
 //******************************************************************************************
