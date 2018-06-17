@@ -91,25 +91,20 @@ byte ImReady() {
 
 
 //-----------------------------------------------------------
-// animation de départ allume une ligne et une colonne
+// Allume les cases ou une piece est passée
 //-----------------------------------------------------------
 byte onePiece() {
   
   for (int i = 0; i < 8; i++) {        
     for (int j = 0; j < 8; j++) {
-      if (bitRead(ChessBoard.bitMap[i], j)==1){
-        
+      if (bitRead(ChessBoard.bitMap[i], j)==1){        
            
-        matrix.drawPixel(i, j, LED_ON);    
-        
+        matrix.drawPixel(i, j, LED_ON);            
         
       }
     matrix.writeDisplay();  // write the changes we just made to the display
-    
     }
-  }
-  
-  //delay(10);
+  } 
   return 0;
 }
 
@@ -121,13 +116,14 @@ void setup()
 {
   //initialisation du port serie
   Serial.begin(115200);
-  //Serial.println("HELLO WORLD");  
-  
+  //on dit bonjour
+  Serial.println("HELLO WORLD");  
+  delay(100);
+
   //anti rebond et appuis long
   ChessBoard.setDebounceTime(10);
   ChessBoard.setHoldTime(2000);
-  ChessBoard.getKeys();
-  PermuToBOARD();  
+  
   
   //initialise la matrice
   matrix.begin(0x70);  
@@ -135,10 +131,16 @@ void setup()
   matrix.clear();      
   matrix.writeDisplay();
   //matrix.setBrightness(16);
+  
+  //récupère nombre de pièce
+  ChessBoard.getKeys();
+  PermuToBOARD();  
 
+  //animpation je suis pret
   ImReady();
-  /*
-   while (nbPiece < 3)
+
+  // moins de 3 pièces "mode dessin"
+  while (nbPiece < 3)
   {
     if ( ChessBoard.getKeys() )
     {
@@ -152,10 +154,11 @@ void setup()
   }    
 
   //-----------------------------------------------------------
-  //  Allume les cases qui contiennent une piece
+  // Allume les cases qui contiennent une piece
   // lorsuqu'il y a moins de 16 pieces
+  // une piece sur les 4 cases du centre permet de zapper ce mode
   //-----------------------------------------------------------  
-  while (nbPiece < 17)
+  while ((nbPiece < 17) and (strPos !="0.0.0.24.24.0.0.0."))
   {
     if ( ChessBoard.getKeys() )
     {
@@ -167,7 +170,10 @@ void setup()
       Serial.println(nbPiece);     
     }
   }    
-  for (int i=0;i<8;i++) { NewbitMap[i]=abs(195-NewbitMap[i]); } //inversion de la signature
+
+  // inversion de la signature à la 17° piece
+  // alllume maintenant les cases inoccupées de la position de départ 
+  for (int i=0;i<8;i++) { NewbitMap[i]=abs(195-NewbitMap[i]); } 
   matrix.clear();
   matrix.drawBitmap(0, 0, NewbitMap, 8, 8, LED_ON);
   matrix.writeDisplay();     
@@ -175,8 +181,9 @@ void setup()
   //-----------------------------------------------------------
   //  Allume les cases de la position de départ
   //  qui ne contiennent pas de piece
+  // une piece sur les 4 cases du centre permet de zapper ce mode
   //-----------------------------------------------------------
-  while (strPos !="195.195.195.195.195.195.195.195.")
+  while ((strPos !="195.195.195.195.195.195.195.195.") and (strPos !="0.0.0.24.24.0.0.0."))
   {
     if ( ChessBoard.getKeys() )
     {
@@ -190,9 +197,9 @@ void setup()
       Serial.println(nbPiece);     
     }
   }  
+    
   // il est pret lance l'animation
-  ImReady();
-  */
+  ImReady();  
 }
 
 //******************************************************************************************
