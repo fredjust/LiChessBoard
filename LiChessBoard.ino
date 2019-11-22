@@ -2,9 +2,6 @@
 // GESTION DU Pseudo CLAVIER 8x8
 //-----------------------------------------------------------
 
-#include "Key.h"    //ATTENTION VERSION PERSO MODIFIE
-#include "Keypad.h" //ATTENTION VERSION PERSO MODIFIE
-
 // GESTION des LED
 
 #include <Wire.h>
@@ -12,29 +9,16 @@
 #include "Adafruit_LEDBackpack.h"
 Adafruit_8x8matrix matrix = Adafruit_8x8matrix();
 
-//bool etatchange = false;
-
-//tableau utile que pour la bibliotheque key
-char hexaKeys[8][8] = {
-  {'1', '2', '3', '4', '5', '6', '7', '8'},
-  {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'},
-  {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'},
-  {'&', 'B', '#', '{', '(', '-', 'B', '_'},
-  {'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p'},
-  {'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P'},
-  {'q', 'r', 's', 't', 'u', 'v', 'w', 'x'},
-  {'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X'}
-};
-
-//byte rowPins[8] = {12, 11, 10, 9, 8, 7, 6, 13}; 
-//byte colPins[8] = {14, 15, 16, 17, 4, 3, 2, 5}; 
 
 //LES BONNES PIN POUR MON LICHESSBOARD tout en un 50 vert
 byte rowPins[8] = {12, 11, 10, 9, 8, 7, 6, 5}; 
 byte colPins[8] = {13, 2, 3, 4, 17, 16, 15, 14}; 
 
-byte NewbitMap[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-byte OldbitMap[8][8]; //pour sauvegarder l'ancien état et allumer la derniere case dans le mode LED
+//état du plateau contenant les 8 bytes
+byte BitMap[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+byte NewBitMap[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+byte OldBitMap[8][8]; //pour sauvegarder l'ancien état et allumer la derniere case dans le mode LED
 
 byte modeLED=0; //mode LED : allume les deux dernières cases modifiées
 
@@ -45,15 +29,46 @@ byte lastj=0;
 //stock s'il est nécessaire d'éffacer
 bool doDEL=false;
 
-//initialize an instance of class NewKeypad
-Keypad ChessBoard = Keypad( makeKeymap(hexaKeys), rowPins, colPins, 8, 8);
-
 //temps du dernier changement
 unsigned long startTime;
 
 //la chaine a passer via USB
 String strPos = "0.0.0.0.0.0.0.0.";
 int nbPiece = 0; // nombre de pièce sur l'échiquier
+
+//temps minimum en milli seconde avant rescan de l'échiquier
+byte const debounceTime =10;
+
+//*********************************************************
+// SCAN LE CLAVIER
+//*********************************************************
+bool getKeys() 
+{
+  bool keyActivity = false; 
+
+  if ( (millis()-startTime)>debounceTime ) //si le dernier scan n'est pas trop récent
+  {               
+    // RE INITIALISE LES PORTS A CHAQUE FOIS 
+    // CELA PERMET DE LES UTILISER AVEC UN AUTRE MATERIEL
+    for (byte r=0; r<8; r++) { pinMode(rowPins[r],INPUT_PULLUP); }  
+          
+      for (byte c=0; c<8; c++)     
+      {
+        pinMode(colPins[c],OUTPUT);
+        digitalWrite(colPins[c], LOW);  // Begin column pulse output.
+        for (byte r=0; r<8; r++) 
+        {
+          if (!digitalRead(rowPins[r])!=bitRead(BitMap[r],c)) { keyActivity=true; }   //inverser r et c pour inverser ligne colonne   
+          bitWrite(BitMap[r], c, !digitalRead(rowPins[r]));  
+        }         
+        // REMET LE PORT EN ETAT POUR LA PROCHAINE LECTURE
+        digitalWrite(colPins[c],HIGH);
+        pinMode(colPins[c],INPUT);
+      }
+     
+  }
+  return keyActivity;
+}
 
 //-----------------------------------------------------------
 // effectue les permutations de bits pour renvoyer les bonnes signatures plateau
@@ -68,14 +83,14 @@ void PermuToBOARD() {
     for (int b = 7; b >= 0; b--)
     {
       //sauvegarde de l'ancien état
-      OldbitMap[i][b]=bitRead(ChessBoard.bitMap[i], b);        
-      // bitRead(ChessBoard.bitMap[gauche/droite b/7-b],blancs/noirs i/7-i)    
-      bitWrite( TempoBitMap, b, bitRead(ChessBoard.bitMap[7 - b], 7-i) );   
-      nbPiece=nbPiece+bitRead(ChessBoard.bitMap[7-b],7-i);
+      OldBitMap[i][b]=bitRead(BitMap[i], b);        
+     
+      bitWrite( TempoBitMap, b, bitRead(BitMap[7 - b], 7-i) );   
+      nbPiece=nbPiece+bitRead(BitMap[7-b],7-i);
     }
     strPos = strPos + TempoBitMap;
     strPos = strPos + ".";
-    NewbitMap[7 - i] = TempoBitMap;               
+    NewBitMap[7 - i] = TempoBitMap;               
   }    
 }
 
@@ -113,7 +128,7 @@ byte onePiece() {
   
   for (int i = 0; i < 8; i++) {        
     for (int j = 0; j < 8; j++) {
-      if (bitRead(ChessBoard.bitMap[i], j)==1){        
+      if (bitRead(BitMap[i], j)==1){        
            
         matrix.drawPixel(i, j, LED_ON);            
         
@@ -132,10 +147,10 @@ byte lastSquare() {
   
   for (int i = 0; i < 8; i++) {        
     for (int j = 0; j < 8; j++) {
-      if (bitRead(ChessBoard.bitMap[i], j)!=OldbitMap[i][j]) {  
+      if (bitRead(BitMap[i], j)!=OldBitMap[i][j]) {  
         matrix.clear();  
         matrix.drawPixel(i, j, LED_ON); 
-        if (OldbitMap[i][j]==0) {matrix.drawPixel(lasti, lastj, LED_ON); }
+        if (OldBitMap[i][j]==0) {matrix.drawPixel(lasti, lastj, LED_ON); }
         if (lasti!=i) {lasti=i;};
         if (lastj!=j) {lastj=j;};
       }    
@@ -158,10 +173,7 @@ void setup()
   Serial.println("HELLO WORLD");  
   delay(100);
 
-  //anti rebond et appuis long
-  ChessBoard.setDebounceTime(10);
-  ChessBoard.setHoldTime(2000);
-  
+
   
   //initialise la matrice
   matrix.begin(0x70);  
@@ -171,7 +183,7 @@ void setup()
   //matrix.setBrightness(16);
   
   //récupère nombre de pièce
-  ChessBoard.getKeys();
+  getKeys();
   PermuToBOARD();  
 
   //animpation je suis pret
@@ -180,7 +192,7 @@ void setup()
   // moins de 3 pièces "mode dessin"
   while (nbPiece < 3)
   {
-    if ( ChessBoard.getKeys() )
+    if ( getKeys() )
     {
       PermuToBOARD();           
       onePiece();
@@ -196,11 +208,11 @@ void setup()
   // une piece sur les 4 cases du centre permet de zapper ce mode
    while ((nbPiece < 17) and (strPos !="0.0.0.24.24.0.0.0."))
   {
-    if ( ChessBoard.getKeys() )
+    if ( getKeys() )
     {
       PermuToBOARD();           
       matrix.clear();
-      matrix.drawBitmap(0, 0, NewbitMap, 8, 8, LED_ON);
+      matrix.drawBitmap(0, 0, NewBitMap, 8, 8, LED_ON);
       matrix.writeDisplay();      
       Serial.println(strPos);               
       Serial.println(nbPiece);  
@@ -216,9 +228,9 @@ void setup()
 
   // inversion de la signature à la 17° piece
   // alllume maintenant les cases inoccupées de la position de départ 
-  for (int i=0;i<8;i++) { NewbitMap[i]=abs(195-NewbitMap[i]); } 
+  for (int i=0;i<8;i++) { NewBitMap[i]=abs(195-NewBitMap[i]); } 
   matrix.clear();
-  matrix.drawBitmap(0, 0, NewbitMap, 8, 8, LED_ON);
+  matrix.drawBitmap(0, 0, NewBitMap, 8, 8, LED_ON);
   matrix.writeDisplay();     
       
   
@@ -228,7 +240,7 @@ void setup()
   // passe en mode led s'il manque les 4 tours
   while ((strPos !="195.195.195.195.195.195.195.195.") and (strPos !="0.0.0.24.24.0.0.0."))
   {
-    if ( ChessBoard.getKeys() )
+    if ( getKeys() )
     {
       //passe en mode led s'il manque les 4 tours
       if (strPos=="66.195.195.195.195.195.195.66.")
@@ -239,9 +251,9 @@ void setup()
       }
       PermuToBOARD();
       //inversion de la signature
-      for (int i=0;i<8;i++) { NewbitMap[i]=abs(195-NewbitMap[i]); }
+      for (int i=0;i<8;i++) { NewBitMap[i]=abs(195-NewBitMap[i]); }
       matrix.clear();
-      matrix.drawBitmap(0, 0, NewbitMap, 8, 8, LED_ON);
+      matrix.drawBitmap(0, 0, NewBitMap, 8, 8, LED_ON);
       matrix.writeDisplay();      
       Serial.println(strPos);               
       Serial.println(nbPiece);     
@@ -289,7 +301,7 @@ void loop() {
   }
 
   //si y'a du changement
-  if ( ChessBoard.getKeys() )
+  if ( getKeys() )
   {
     if (modeLED==1) {lastSquare();}    
     PermuToBOARD();   
@@ -308,4 +320,3 @@ void loop() {
     }
   }
 }
-
