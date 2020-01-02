@@ -39,6 +39,13 @@ int nbPiece = 0; // nombre de pièce sur l'échiquier
 //temps minimum en milli seconde avant rescan de l'échiquier
 byte const debounceTime =10;
 
+String inputString = "";         // a String to hold incoming data
+bool stringComplete = false;  // whether the string is complete
+
+byte ligne = 0;
+byte colonne = 0;
+
+
 //*********************************************************
 // SCAN LE CLAVIER
 //*********************************************************
@@ -173,7 +180,8 @@ void setup()
   Serial.println("HELLO WORLD");  
   delay(100);
 
-
+  // reserve 128 bytes for the inputString:
+  inputString.reserve(128);
   
   //initialise la matrice
   matrix.begin(0x70);  
@@ -270,35 +278,27 @@ void setup()
 //*********************************************************************
 
 void loop() {
-  char carlu = 0;
 
   // si on recoit des infos sur le port serie
-  while (Serial.available() > 0)
-  { // tant que des caractères sont en attente
-    delay(10);
-    carlu = Serial.read();
-    if (carlu == 'c') { //on recoit 'c' on efface tout
-      matrix.clear();
-    }
-    if (carlu == 'o') { // on revoit 'o' les coordonnée de deux cases a allumer vont suivre
-      matrix.clear();
-      //permiere case
-      int ligne = Serial.parseInt();
-      int colonne = Serial.parseInt();
-      if (ligne > 0 && ligne < 9 && colonne > 0 && colonne < 9)
-      {
-        matrix.drawPixel(8 - ligne, colonne - 1, LED_ON);
-      }
-      //deuxième case
-      ligne = Serial.parseInt();
-      colonne = Serial.parseInt();
-      if (ligne > 0 && ligne < 9 && colonne > 0 && colonne < 9)
-      {
-        matrix.drawPixel(8 - ligne, colonne - 1, LED_ON);
-      };
-    }
-    matrix.writeDisplay();
-  }
+  if (stringComplete) {
+  	if (inputString.length()-1==1) {
+		matrix.clear();
+	}
+	else {
+		matrix.clear();
+		for (int i=0;i<inputString.length()-1;i=i+2) {
+			ligne=byte(inputString[i])-48;
+			colonne=byte(inputString[i+1])-48;
+			matrix.drawPixel(8 - ligne, colonne - 1, LED_ON);
+		}
+	}
+
+	matrix.writeDisplay();
+	// clear the string:
+	inputString = "";
+	stringComplete = false;
+   }
+
 
   //si y'a du changement
   if ( getKeys() )
@@ -317,6 +317,25 @@ void loop() {
       matrix.clear();
       matrix.writeDisplay();
       doDEL=false;      
+    }
+  }
+}
+
+/*
+  SerialEvent occurs whenever a new data comes in the hardware serial RX. This
+  routine is run between each time loop() runs, so using delay inside loop can
+  delay response. Multiple bytes of data may be available.
+*/
+void serialEvent() {
+  while (Serial.available()) {
+    // get the new byte:
+    char inChar = (char)Serial.read();
+    // add it to the inputString:
+    inputString += inChar;
+    // if the incoming character is a newline, set a flag so the main loop can
+    // do something about it:
+    if (inChar == '\n') {
+      stringComplete = true;
     }
   }
 }
